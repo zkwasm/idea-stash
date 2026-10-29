@@ -18,6 +18,9 @@ const autoNudge = atom(
 // session only, and the next session starts fresh with it off.
 const muted = atom({ plugin: 'idea-stash', key: 'muted' } as const, false)
 
+const plural = (n: number, word: string): string =>
+  `${n} ${word}${n === 1 ? '' : 's'}`
+
 // Time of day, prefixed with MM-DD when the idea is not from today.
 const hhmm = (ms: number): string => {
   const d = new Date(ms)
@@ -39,7 +42,7 @@ const refreshStatus = async ($: EngineInterface): Promise<void> => {
     return
   }
   const left = (await read($, ideas)).filter(one => !one.delivered).length
-  $.ui.status(left > 0 ? `💡 ${left} 条未读想法` : undefined)
+  $.ui.status(left > 0 ? `💡 ${plural(left, 'unread idea')}` : undefined)
 }
 
 export const register: Register = on => {
@@ -47,7 +50,7 @@ export const register: Register = on => {
     await $.command.register({
       name: 'idea',
       description:
-        '记想法（不打断 Claude）；`/idea` 开菜单，`del <序号>`/`clear` 删除，`off`/`on` 本会话静音',
+        'Jot an idea without interrupting Claude. `/idea` opens the menu; `del <n>`/`clear` remove; `off`/`on` mute this session.',
     })
     // Opened on demand via /idea as a focused dialog, not auto-docked.
     await refreshStatus($)
@@ -59,55 +62,57 @@ export const register: Register = on => {
   on('command.run', { command: 'idea' }, async ($, e) => {
     const text = e.args.trim()
 
-    // `/idea`（空）：打开聚焦的交互菜单（↑↓ 选择 · Enter 删除 · Esc 关闭）。
+    // `/idea` (empty): open the focused interactive menu.
     if (text === '') {
       const list = await read($, ideas)
       if (list.length === 0) {
-        return { text: '还没有想法。用 `/idea <内容>` 记一条。' }
+        return { text: 'No ideas yet. Jot one with `/idea <text>`.' }
       }
       void $.ui.open({
         id: PANE,
-        title: '💡 想法速记',
+        title: '💡 Ideas',
         focus: true,
         closeOnEscape: true,
         rows: Math.min(list.length + 2, 14),
       })
-      return { text: '想法菜单已打开：↑↓ 选择 · Enter 删除选中 · Esc 关闭。' }
+      return { text: 'Ideas menu opened: ↑↓ select · Enter delete · Esc close.' }
     }
 
-    // `/idea off` / `on`：仅本会话静音（关掉注入与提示；下个会话自动复原）。
-    if (/^(?:off|mute|静音|关闭|关)$/i.test(text)) {
+    // `/idea off` / `on`: mute this session only (no injecting, no prompts).
+    if (/^(?:off|mute)$/i.test(text)) {
       await update($, muted, () => true)
       await refreshStatus($)
-      return { text: '已在本会话静音 idea-stash：不再注入、不再显示提示。想法仍会记下，下个会话自动恢复。`/idea on` 可立即恢复。' }
+      return {
+        text: 'idea-stash muted for this session: no injecting, no prompts. Ideas are still captured, and it resumes next session. Run `/idea on` to resume now.',
+      }
     }
-    if (/^(?:on|unmute|取消静音|恢复|开启|开)$/i.test(text)) {
+    if (/^(?:on|unmute)$/i.test(text)) {
       await update($, muted, () => false)
       await refreshStatus($)
-      return { text: '已在本会话恢复 idea-stash。' }
+      return { text: 'idea-stash resumed for this session.' }
     }
 
-    // `/idea del <序号>`：按清单编号删除一条。
-    const del = text.match(/^(?:del|rm|delete|删除|删)\s+(\d+)$/i)
+    // `/idea del <n>`: delete one idea by its list number.
+    const del = text.match(/^(?:del|rm|delete)\s+(\d+)$/i)
     if (del) {
       const n = Number(del[1])
       const list = await read($, ideas).then(l => l.slice(-30))
       const target = list[n - 1]
       if (!target) {
-        return { text: `没有第 ${n} 条。先用 \`/idea\` 看看清单的编号。` }
+        return { text: `No #${n}. Run \`/idea\` to see the list numbers.` }
       }
       await update($, ideas, l => l.filter(one => one.id !== target.id))
       await refreshStatus($)
-      return { text: `已删除第 ${n} 条：“${target.text.slice(0, 40)}”` }
+      return { text: `Deleted #${n}: “${target.text.slice(0, 40)}”` }
     }
 
-    // `/idea clear`：一键清除所有已读（Claude 已读过的）想法。
-    if (/^(?:clear|清除已读|清空已读|清除|清空)$/i.test(text)) {
+    // `/idea clear`: remove every idea Claude has already read.
+    if (/^clear$/i.test(text)) {
       const before = (await read($, ideas)).length
       await update($, ideas, l => l.filter(one => !one.delivered))
       const removed = before - (await read($, ideas)).length
       await refreshStatus($)
-      return { text: `已清除 ${removed} 条已读想法。` }
+      return { text: `Cleared ${plural(removed, 'read idea')}.` }
     }
 
     const idea: Idea = {
@@ -118,9 +123,11 @@ export const register: Register = on => {
     }
     await update($, ideas, list => [...list, idea].slice(-500))
     await refreshStatus($)
-    $.ui.toast(`💡 已记下：${text.slice(0, 40)}`)
+    $.ui.toast(`💡 Stashed: ${text.slice(0, 40)}`)
 
-    return { text: `已记下想法，Claude 下次开始工作时会自动读到：\n  “${text}”` }
+    return {
+      text: `Stashed. Claude will read it automatically on its next turn:\n  “${text}”`,
+    }
   })
 
   // Feed undelivered ideas into each real prompt as a hidden context block,
@@ -143,7 +150,7 @@ export const register: Register = on => {
             .map((one, i) => `${i + 1}. [${hhmm(one.at)}] ${one.text}`)
             .join('\n')
           const block =
-            '以下是用户在你工作期间随手记下的新想法/提示，请在继续当前及后续工作时主动纳入考虑：\n' +
+            'The user jotted these ideas while you were working. Take them into account as you continue the current and following work:\n' +
             lines
 
           const done = new Set(pending.map(one => one.id))
@@ -161,12 +168,14 @@ export const register: Register = on => {
     return next(event)
   })
 
-  // B 模式：工作期间新记的想法（本轮没投递）弹个提醒。
+  // Optional nudge: ideas jotted mid-turn (not injected this turn) get a toast.
   on('turn.complete', async ($, e, next) => {
     if (await read($, autoNudge)) {
       const left = (await read($, ideas)).filter(one => !one.delivered).length
       if (left > 0) {
-        $.ui.toast(`💡 工作期间记了 ${left} 条想法，下次开始时会带给 Claude`)
+        $.ui.toast(
+          `💡 ${plural(left, 'idea')} stashed while working — handed to Claude next turn`,
+        )
       }
     }
 
@@ -187,7 +196,7 @@ export const register: Register = on => {
 
     return (
       <Box>
-        <Text>💡 {pending.length} 条未读想法</Text>
+        <Text>💡 {plural(pending.length, 'unread idea')}</Text>
         <Text dimColor> · {latest.text.slice(0, 48)}</Text>
       </Box>
     )
@@ -202,7 +211,7 @@ export const register: Register = on => {
     if (list.length === 0) {
       return (
         <Box flexDirection="column">
-          <Text dimColor>还没有想法。用 /idea &lt;内容&gt; 记一条。</Text>
+          <Text dimColor>No ideas yet. Jot one with /idea &lt;text&gt;.</Text>
         </Box>
       )
     }
@@ -217,7 +226,7 @@ export const register: Register = on => {
       await update($, ideas, l => l.filter(one => one.id !== id))
       await refreshStatus($)
       if (victim) {
-        $.ui.toast(`🗑 已删除：${victim.text.slice(0, 30)}`)
+        $.ui.toast(`🗑 Deleted: ${victim.text.slice(0, 30)}`)
       }
       if ((await read($, ideas)).length === 0) {
         void $.ui.close({ id: PANE })
@@ -226,7 +235,8 @@ export const register: Register = on => {
 
     const header = (
       <Text dimColor>
-        共 {list.length} 条 · 未读 {pending} 条 · ↑↓ 选择 · Enter 删除 · Esc 关闭
+        {list.length} total · {pending} unread · ↑↓ select · Enter delete · Esc
+        close
       </Text>
     )
 
@@ -245,11 +255,15 @@ export const register: Register = on => {
 
     const { Select } = t
 
+    // Key the Select on the current ids so a delete rebuilds it with the new
+    // options — a stable key would keep showing the just-removed row.
+    const selectKey = `ideas-${options.map(o => o.value).join(',')}`
+
     return (
       <Box flexDirection="column">
         {header}
         <Select
-          key="ideas"
+          key={selectKey}
           autoFocus
           options={options}
           onSelect={(id: string) => void remove(id)}

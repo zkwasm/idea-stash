@@ -34,20 +34,20 @@ test('a captured idea is injected once, then marked delivered', async ($, on) =>
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
 
   // Capturing an idea must not reach the model — it returns its own text.
-  const ran = await $.command.run({ command: 'idea', args: '抽出登录模块' })
-  expect(ran.text).toContain('抽出登录模块')
+  const ran = await $.command.run({ command: 'idea', args: 'extract auth module' })
+  expect(ran.text).toContain('extract auth module')
   // The status line now shows the unread count.
   expect(status).toContain('1')
 
   // Next real prompt: the idea rides in a hidden context block.
-  await $.prompt.submit({ text: '继续' })
-  expect(hasIdea(/抽出登录模块/)).toBe(true)
+  await $.prompt.submit({ text: 'continue' })
+  expect(hasIdea(/extract auth module/)).toBe(true)
   // Read now, the status line is cleared.
   expect(status).toBe(undefined)
 
   // A later prompt no longer carries it — it was marked delivered.
-  await $.prompt.submit({ text: '再继续' })
-  expect(hasIdea(/抽出登录模块/)).toBe(false)
+  await $.prompt.submit({ text: 'keep going' })
+  expect(hasIdea(/extract auth module/)).toBe(false)
 })
 
 const BAND = {
@@ -66,16 +66,16 @@ test('the band shows the unread count until ideas are read', async ($, on) => {
   })
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
 
-  await $.command.run({ command: 'idea', args: '抽出登录模块' })
+  await $.command.run({ command: 'idea', args: 'extract auth module' })
 
   const before = await $.ui.mount({ ...BAND, surface: 'terminal' })
-  expect((await before.find({ type: 'Text', text: /未读想法/ }))?.text).toContain(
+  expect((await before.find({ type: 'Text', text: /unread idea/ }))?.text).toContain(
     '1',
   )
   await before.unmount()
 
   // After the idea is delivered, the band yields to the engine.
-  await $.prompt.submit({ text: '继续' })
+  await $.prompt.submit({ text: 'continue' })
   const after = await $.ui.mount({ ...BAND, surface: 'terminal' })
   expect((await after.find({ type: 'Text', text: /engine/ }))?.text).toBe('engine')
   await after.unmount()
@@ -86,7 +86,7 @@ const PANE = {
   component: 'Pane',
   requestId: 'idea-stash',
   props: {
-    title: '💡 想法速记',
+    title: '💡 Ideas',
     isFocused: false,
     bodyColumns: 48,
     placement: 'dock',
@@ -98,7 +98,7 @@ const PANE = {
 test('the pane renders an interactive Select of the ideas', async ($, on) => {
   seat(on)
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.command.run({ command: 'idea', args: '测试想法A' })
+  await $.command.run({ command: 'idea', args: 'test idea A' })
 
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
   expect(await ui.find({ type: 'Select' })).toBeTruthy()
@@ -108,62 +108,62 @@ test('the pane renders an interactive Select of the ideas', async ($, on) => {
 test('/idea del <n> removes the numbered idea', async ($, on) => {
   seat(on)
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.command.run({ command: 'idea', args: '测试想法A' })
-  await $.command.run({ command: 'idea', args: '测试想法B' })
+  await $.command.run({ command: 'idea', args: 'test idea A' })
+  await $.command.run({ command: 'idea', args: 'test idea B' })
 
   // Delete #1 (A); B shifts up to #1; a third delete finds the list empty.
   const del1 = await $.command.run({ command: 'idea', args: 'del 1' })
-  expect(del1.text).toContain('测试想法A')
+  expect(del1.text).toContain('test idea A')
   const del2 = await $.command.run({ command: 'idea', args: 'del 1' })
-  expect(del2.text).toContain('测试想法B')
+  expect(del2.text).toContain('test idea B')
   const del3 = await $.command.run({ command: 'idea', args: 'del 1' })
-  expect(del3.text).toContain('没有第 1 条')
+  expect(del3.text).toContain('No #1')
 })
 
 test('/idea clear removes only the read (delivered) ideas', async ($, on) => {
   seat(on)
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.command.run({ command: 'idea', args: '旧想法' })
+  await $.command.run({ command: 'idea', args: 'old idea' })
   // Reading it marks it delivered; a second idea stays unread.
-  await $.prompt.submit({ text: '继续' })
-  await $.command.run({ command: 'idea', args: '新想法' })
+  await $.prompt.submit({ text: 'continue' })
+  await $.command.run({ command: 'idea', args: 'new idea' })
 
   const cleared = await $.command.run({ command: 'idea', args: 'clear' })
-  expect(cleared.text).toContain('已清除 1 条')
+  expect(cleared.text).toContain('Cleared 1 read idea')
 
   // The unread one survives and still injects.
-  await $.prompt.submit({ text: '再继续' })
-  expect(hasIdea(/新想法/)).toBe(true)
-  expect(hasIdea(/旧想法/)).toBe(false)
+  await $.prompt.submit({ text: 'keep going' })
+  expect(hasIdea(/new idea/)).toBe(true)
+  expect(hasIdea(/old idea/)).toBe(false)
 })
 
 test('/idea off mutes injection for the session, /idea on restores it', async ($, on) => {
   seat(on)
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.command.run({ command: 'idea', args: '静音前的想法' })
+  await $.command.run({ command: 'idea', args: 'idea before mute' })
 
   // Muted: the next real prompt carries no idea, and the status line clears.
   await $.command.run({ command: 'idea', args: 'off' })
   expect(status).toBe(undefined)
-  await $.prompt.submit({ text: '继续' })
-  expect(hasIdea(/静音前的想法/)).toBe(false)
+  await $.prompt.submit({ text: 'continue' })
+  expect(hasIdea(/idea before mute/)).toBe(false)
 
   // Unmuted: the still-undelivered idea injects again.
   await $.command.run({ command: 'idea', args: 'on' })
-  await $.prompt.submit({ text: '再继续' })
-  expect(hasIdea(/静音前的想法/)).toBe(true)
+  await $.prompt.submit({ text: 'keep going' })
+  expect(hasIdea(/idea before mute/)).toBe(true)
 })
 
 test('bare /idea opens the menu and adds nothing of its own', async ($, on) => {
   seat(on)
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
 
-  await $.command.run({ command: 'idea', args: '测试想法A' })
+  await $.command.run({ command: 'idea', args: 'test idea A' })
   // Bare /idea opens the interactive menu; it stores no idea of its own.
   const ran = await $.command.run({ command: 'idea', args: '' })
-  expect(ran.text).toContain('菜单已打开')
+  expect(ran.text).toContain('menu opened')
 
   // The one real idea still injects on the next prompt.
-  await $.prompt.submit({ text: '继续' })
-  expect(hasIdea(/测试想法A/)).toBe(true)
+  await $.prompt.submit({ text: 'continue' })
+  expect(hasIdea(/test idea A/)).toBe(true)
 })

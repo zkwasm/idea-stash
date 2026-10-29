@@ -1,7 +1,7 @@
 {
   "name": "idea-stash",
   "version": "0.1.0",
-  "description": "随手记下想法而不打断 Claude，下一轮开始时自动带给它",
+  "description": "Jot ideas mid-session without interrupting Claude — handed to it on your next message",
   "author": { "name": "zkwasm" },
   "homepage": "https://github.com/zkwasm/idea-stash",
   "license": "MIT",

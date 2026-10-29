@@ -1,45 +1,51 @@
 # idea-stash
 
-在 Claude Code 长时间工作时，随手记下想法而**不打断**它——下一轮开始时自动带给 Claude。
+Jot an idea during a long Claude Code session **without interrupting Claude** — it's handed to Claude automatically on your next message.
 
-长会话里你常会冒出新思路，但不想打断 Claude 手头的活。`/idea <想法>` 把它存下来，不进对话、不触发回合；等你下一次真正发消息时，所有未读想法作为隐藏上下文一起带给 Claude，它会主动纳入考虑。
+In a long session you keep having new thoughts, but you don't want to interrupt Claude's current work. `/idea <thought>` stores it — no turn is triggered, Claude isn't interrupted. The next time you actually send a message, every unread idea rides along as hidden context so Claude folds them into the work.
 
-## 安装
+## Install
 
-在终端会话的输入框里：
+At the prompt of a Claude Code terminal session:
 
 ```
 /plugin install idea-stash --marketplace zkwasm/idea-stash
 ```
 
-会先问 `Add marketplace?`（输入 `y`），再选安装范围（默认 **user**，回车即可）。装完立即在当前会话生效，之后每个新会话都会自动加载。
+Answer `y` to *Add marketplace?*, then press Enter to accept the **user** scope. It's active immediately, and loads in every session you start afterward.
 
-桌面 App 里（`/plugin` 不可用时）：点输入框旁的 `+` → Plugins → Add marketplace 填 `zkwasm/idea-stash` → Add plugin。
+In the desktop app (where `/plugin` isn't available): click the `+` next to the prompt box → Plugins → Add marketplace `zkwasm/idea-stash` → Add plugin.
 
-## 用法
+## Usage
 
-| 命令 | 作用 |
+| Command | What it does |
 |---|---|
-| `/idea <内容>` | 记一条想法（不打断 Claude） |
-| `/idea` | 打开想法菜单：↑↓ 选择、Enter 删除选中、Esc 关闭 |
-| `/idea del <序号>` | 按清单编号删除一条 |
-| `/idea clear` | 清除所有已读（Claude 已读过）的想法 |
-| `/idea off` / `/idea on` | **仅本会话**静音 / 恢复 |
+| `/idea <text>` | Stash an idea without interrupting Claude |
+| `/idea` | Open the ideas menu: ↑↓ select, Enter delete, Esc close |
+| `/idea del <n>` | Delete one idea by its list number |
+| `/idea clear` | Clear every idea Claude has already read |
+| `/idea off` / `/idea on` | Mute / resume **for the current session only** |
 
-记下未读想法时，输入框上方会有一条提示条、状态栏也会显示未读数量；等 Claude 读到后自动消失。
+While you have unread ideas, a banner above the prompt and the status line show the unread count; both clear once Claude reads them.
 
-### 全局开启、单会话关闭
+### Global on, per-session off
 
-以 user 范围安装后，idea-stash 在**所有会话**自动启用。某个会话不想用它时，`/idea off` 只静音**当前会话**（不注入、不显示提示），下个会话自动恢复。
+Installed at **user** scope, idea-stash is enabled in **every** session. To turn it off in just one session, `/idea off` mutes the **current** session only (no injecting, no prompts) and resets automatically next session.
 
-> 注意：`/plugin` 面板里的禁用是**全局持久**的（关了所有会话都关）。要「只关当前这一个会话」，请用 `/idea off`。
+> Note: the native `/plugin` toggle disables a plugin **globally** (every session). For "just this one session", use `/idea off`.
 
-## 工作原理
+## Platforms
 
-- `/idea` 由插件的 `command.run` 直接处理，**不经过模型**。
-- 想法通过 `prompt.submit` 钩子，作为隐藏的 `context` 块追加到你下一条真实消息上，随即标记为已读。
-- 想法存在会话状态里；`off` 开关是会话级的，下个会话自动复原。
+- **Terminal** and **Claude Code Desktop**: full support, including the interactive `/idea` menu.
+- **VS Code**: full support.
+- **Mobile**: capture and injection work; the mobile surface has no picker, so `/idea` shows a read-only list and you delete with `/idea del <n>`.
+
+## How it works
+
+- `/idea` is handled by the plugin's `command.run` hook — it **never reaches the model**.
+- Ideas are appended to your next real prompt as a hidden `context` block via a `prompt.submit` hook, then marked as read.
+- Ideas live in session state; the `off` switch is session-scoped and resets next session.
 
 ## License
 
-MIT，见 [LICENSE](./LICENSE)。
+MIT — see [LICENSE](./LICENSE).
