@@ -1,0 +1,9 @@
+{
+  "name": "idea-stash",
+  "version": "0.1.0",
+  "description": "随手记下想法而不打断 Claude，下一轮开始时自动带给它",
+  "author": { "name": "zkwasm" },
+  "homepage": "https://github.com/zkwasm/idea-stash",
+  "license": "MIT",
+  "types": "./types/index.d.ts"
+}
