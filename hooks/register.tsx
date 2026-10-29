@@ -131,30 +131,34 @@ export const register: Register = on => {
     if (e.command || e.isMeta) {
       return next(e)
     }
-    // Muted this session: do not inject; ideas stay undelivered for later.
-    if (await read($, muted)) {
-      return next(e)
+    // Gating hook: any failure of ours must never block the user's prompt, so
+    // compute the (possibly rewritten) event defensively and call next once.
+    let event = e
+    try {
+      // Muted this session: do not inject; ideas stay undelivered for later.
+      if (!(await read($, muted))) {
+        const pending = (await read($, ideas)).filter(one => !one.delivered)
+        if (pending.length > 0) {
+          const lines = pending
+            .map((one, i) => `${i + 1}. [${hhmm(one.at)}] ${one.text}`)
+            .join('\n')
+          const block =
+            '以下是用户在你工作期间随手记下的新想法/提示，请在继续当前及后续工作时主动纳入考虑：\n' +
+            lines
+
+          const done = new Set(pending.map(one => one.id))
+          await update($, ideas, l =>
+            l.map(one => (done.has(one.id) ? { ...one, delivered: true } : one)),
+          )
+          await refreshStatus($)
+          event = { ...e, context: [...(e.context ?? []), block] }
+        }
+      }
+    } catch {
+      event = e
     }
-    const list = await read($, ideas)
-    const pending = list.filter(one => !one.delivered)
-    if (pending.length === 0) {
-      return next(e)
-    }
 
-    const lines = pending
-      .map((one, i) => `${i + 1}. [${hhmm(one.at)}] ${one.text}`)
-      .join('\n')
-    const block =
-      '以下是用户在你工作期间随手记下的新想法/提示，请在继续当前及后续工作时主动纳入考虑：\n' +
-      lines
-
-    const done = new Set(pending.map(one => one.id))
-    await update($, ideas, l =>
-      l.map(one => (done.has(one.id) ? { ...one, delivered: true } : one)),
-    )
-    await refreshStatus($)
-
-    return next({ ...e, context: [...(e.context ?? []), block] })
+    return next(event)
   })
 
   // B 模式：工作期间新记的想法（本轮没投递）弹个提醒。

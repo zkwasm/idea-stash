@@ -1,0 +1,9 @@
+# Engine-written editor types (regenerated when the plugin loads)
+.claude-plugin/types/
+# Engine MCP bundle cache
+.mcpb-cache/
+# OS / editor cruft
+.DS_Store
+*~
+*.swp
+*.log

@@ -1,5 +1,6 @@
 {
   "name": "idea-stash",
   "owner": { "name": "zkwasm" },
+  "description": "随手记下想法而不打断 Claude，下一轮开始时自动带给它。",
   "plugins": [{ "name": "idea-stash", "source": "./" }]
 }
